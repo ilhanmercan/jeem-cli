@@ -1,0 +1,22 @@
+[project]
+name = "jeem-cli"
+version = "0.1.0"
+description = "CLI for jeem.ai conversational search"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.28",
+    "rich>=13",
+    "click>=8",
+    "pydantic>=2",
+    "uuid6",
+]
+
+[project.scripts]
+jeem = "jeem.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jeem"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
