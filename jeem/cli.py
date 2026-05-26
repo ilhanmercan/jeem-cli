@@ -22,20 +22,9 @@ from jeem.session import (
 console = Console()
 
 
-@click.group()
-def main():
-    """jeem — conversational search CLI for jeem.ai"""
+# ── Shared query logic ────────────────────────────────────────
 
-
-@main.command()
-@click.argument("query")
-@click.option("--no-stream", is_flag=True, help="Buffer response, print once complete.")
-@click.option("--session", "-s", default=None, help="Session name for multi-turn chat.")
-@click.option("--json", "as_json", is_flag=True, help="Output raw JSON events.")
-def ask(query: str, no_stream: bool, session: str | None, as_json: bool):
-    """Ask a question and get a streaming answer."""
-
-    # ── Load or create session ──────────────────────────────
+def _run_query(query_text: str, no_stream: bool, session: str | None, as_json: bool) -> None:
     sess = None
     if session:
         sess = load(session)
@@ -43,14 +32,13 @@ def ask(query: str, no_stream: bool, session: str | None, as_json: bool):
             sess = Session(name=session, chat_id=new_chat_id())
 
     chat_id = sess.chat_id if sess else new_chat_id()
-    user_msg = create_message(query)
+    user_msg = create_message(query_text)
 
     body = {
         "id": chat_id,
         "messages": [user_msg.model_dump()],
     }
 
-    # ── Add history for session mode ────────────────────
     if sess and sess.messages:
         history = [m.model_dump() for m in sess.messages]
         history.append(user_msg.model_dump())
@@ -66,14 +54,42 @@ def ask(query: str, no_stream: bool, session: str | None, as_json: bool):
         asyncio.run(_stream_live(body, sess))
 
 
+# ── Entry point ───────────────────────────────────────────────
+
+@click.group(invoke_without_command=True)
+@click.argument("query", nargs=-1)
+@click.option("--no-stream", is_flag=True, help="Buffer response, print once complete.")
+@click.option("--session", "-s", default=None, help="Session name for multi-turn chat.")
+@click.option("--json", "as_json", is_flag=True, help="Output raw JSON events.")
+@click.pass_context
+def main(ctx: click.Context, query: tuple[str, ...], no_stream: bool, session: str | None, as_json: bool):
+    """jeem — conversational search CLI for jeem.ai"""
+    if ctx.invoked_subcommand is None:
+        query_text = " ".join(query)
+        if not query_text.strip():
+            click.echo(ctx.get_help())
+            return
+        _run_query(query_text, no_stream, session, as_json)
+
+
+@main.command()
+@click.argument("query", nargs=-1)
+@click.option("--no-stream", is_flag=True, help="Buffer response, print once complete.")
+@click.option("--session", "-s", default=None, help="Session name for multi-turn chat.")
+@click.option("--json", "as_json", is_flag=True, help="Output raw JSON events.")
+def ask(query: tuple[str, ...], no_stream: bool, session: str | None, as_json: bool):
+    """Ask a question (explicit alias for jeem <query>)."""
+    _run_query(" ".join(query), no_stream, session, as_json)
+
+
+# ── Streaming ─────────────────────────────────────────────────
+
 async def _stream_json(body: dict) -> None:
-    """Raw JSON event output — useful for debugging / piping."""
     async for event in stream_chat(body):
         console.print_json(data=event.model_dump())
 
 
 async def _stream_live(body: dict, sess: Session | None) -> None:
-    """Stream deltas with a rich Live display updating in real-time."""
     buffer: list[str] = []
     followups: list[str] = []
     finish_reason: str | None = None
@@ -99,7 +115,6 @@ async def _stream_live(body: dict, sess: Session | None) -> None:
     if finish_reason:
         console.print(Text(f"  ⏎  {finish_reason}", style="dim"))
 
-    # ── Persist session ─────────────────────────────────
     if sess:
         assistant_msg = create_message("".join(buffer), role="assistant")
         sess.messages.append(create_message(body["messages"][-1]["parts"][0]["text"]))
@@ -110,7 +125,6 @@ async def _stream_live(body: dict, sess: Session | None) -> None:
 
 
 async def _stream_buffered(body: dict, sess: Session | None) -> None:
-    """Buffer all deltas, then print once complete."""
     buffer: list[str] = []
     followups: list[str] = []
     finish_reason: str | None = None
@@ -147,7 +161,7 @@ def _render(buffer: list[str], followups: list[str]) -> Markdown:
     return Markdown(text, code_theme="github-dark")
 
 
-# ── Session management ─────────────────────────────────────
+# ── Session management ────────────────────────────────────────
 
 @main.group()
 def session():

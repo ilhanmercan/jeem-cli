@@ -27,15 +27,15 @@ pipx install --editable .
 ### Single question
 
 ```bash
-jeem ask "what is the capital of France?"
+jeem what is the capital of France
 ```
 
-Streams the answer in real-time as tokens arrive.
+Streams the answer in real-time as tokens arrive. No quotes needed — just type your question.
 
 ### Buffer mode
 
 ```bash
-jeem ask "explain quantum computing" --no-stream
+jeem --no-stream explain quantum computing
 ```
 
 Waits for the full response, then prints it at once.
@@ -43,8 +43,8 @@ Waits for the full response, then prints it at once.
 ### Multi-turn conversations
 
 ```bash
-jeem ask "my name is Alice" --session chat_name
-jeem ask "what is my name?" --session chat_name
+jeem --session chat my name is Alice
+jeem --session chat what is my name
 ```
 
 Sessions persist to `~/.jeem/sessions/` and survive restarts.
@@ -52,7 +52,7 @@ Sessions persist to `~/.jeem/sessions/` and survive restarts.
 ### Raw JSON output
 
 ```bash
-jeem ask "hi" --json
+jeem --json hi
 ```
 
 Emits each SSE event as a JSON line — useful for piping or debugging.
@@ -65,3 +65,5 @@ jeem session show <name>      # show messages in a session
 jeem session delete <name>    # delete a session
 jeem session delete --all     # delete all sessions
 ```
+
+> `jeem ask <query>` also works as an explicit alias with the same flags.
